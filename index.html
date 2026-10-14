@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetworkInsight Pro - Telecom Intelligence Dashboard</title>
+    <title>Informe Técnico - Geolocalización y Celdas de Red</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,388 +12,310 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            50: '#f0fdf4',
-                            500: '#10b981',
-                            600: '#059669',
-                            900: '#064e3b',
-                        }
+                        darkBg: '#0b132b',
+                        cardBg: '#1c2541',
+                        accentBlue: '#3a506b',
+                        highlightCyan: '#00f2fe'
                     }
                 }
             }
         }
     </script>
-    <!-- Leaflet CSS & JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- FontAwesome para iconos tácticos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .custom-popup .leaflet-popup-content-wrapper {
-            background: #1e293b;
-            color: #f8fafc;
-            border: 1px solid #334155;
-            border-radius: 0.5rem;
+        body { font-family: system-ui, -apple-system, sans-serif; }
+        #map { height: 100vh; width: 100%; z-index: 10; }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #1c2541; color: #fff; border: 1px solid #3a506b; }
+        
+        /* Estilos específicos para impresión / PDF profesional */
+        @media print {
+            body { background: #ffffff !important; color: #000000 !important; }
+            header, aside, .no-print { display: none !important; }
+            main { width: 100% !important; height: auto !important; position: static !important; }
+            #map { height: 450px !important; width: 100% !important; border: 2px solid #000; }
+            .print-container { display: block !important; padding: 20px; }
+            .print-header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
         }
-        .custom-popup .leaflet-popup-tip {
-            background: #1e293b;
-        }
+        .print-container { display: none; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 flex h-screen overflow-hidden">
+<body class="bg-darkBg text-slate-100 flex flex-col h-screen overflow-hidden">
 
-    <!-- Toast Notification Container -->
-    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center space-x-2">
-        <i class="fa-solid fa-circle-check"></i>
-        <span id="toast-msg">Acción realizada con éxito</span>
-    </div>
-
-    <!-- Sidebar Navigation -->
-    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between hidden md:flex">
-        <div>
-            <!-- Brand Logo -->
-            <div class="h-16 flex items-center px-6 border-b border-slate-800 space-x-3">
-                <div class="bg-emerald-500 text-slate-950 p-2 rounded-lg font-bold">
-                    <i class="fa-solid fa-tower-broadcast text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold tracking-wider text-sm text-slate-100">NetworkInsight</h1>
-                    <span class="text-xs text-emerald-400 font-semibold tracking-widest">PRO v4.2</span>
-                </div>
+    <!-- Header / Barra de Navegación Táctica -->
+    <header class="bg-cardBg border-b border-accentBlue px-6 py-3 flex flex-wrap justify-between items-center shadow-lg z-20 no-print">
+        <div class="flex items-center space-x-3">
+            <div class="bg-cyan-500/20 p-2 rounded-lg border border-cyan-500/40 text-cyan-400">
+                <i class="fa-solid fa-tower-broadcast text-xl"></i>
             </div>
-
-            <!-- Navigation Links -->
-            <nav class="p-4 space-y-1">
-                <a href="#" onclick="switchTab('overview')" id="nav-overview" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
-                    <i class="fa-solid fa-chart-pie w-5"></i>
-                    <span class="text-sm font-medium">Overview</span>
-                </a>
-                <a href="#" onclick="switchTab('towers')" id="nav-towers" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 transition">
-                    <i class="fa-solid fa-tower-cell w-5"></i>
-                    <span class="text-sm font-medium">Cell Towers</span>
-                </a>
-                <a href="#" onclick="switchTab('network')" id="nav-network" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
-                    <i class="fa-solid fa-network-wired w-5"></i>
-                    <span class="text-sm font-medium">Network Info</span>
-                </a>
-                <a href="#" onclick="switchTab('lookup')" id="nav-lookup" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
-                    <i class="fa-solid fa-address-book w-5"></i>
-                    <span class="text-sm font-medium">Number Lookup</span>
-                </a>
-                <a href="#" onclick="switchTab('analytics')" id="nav-analytics" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
-                    <i class="fa-solid fa-chart-line w-5"></i>
-                    <span class="text-sm font-medium">Analytics</span>
-                </a>
-            </nav>
+            <div>
+                <h1 class="text-sm md:text-base font-bold text-cyan-400 tracking-wider">INTEL-NET TELECOM &bull; INFORME TÉCNICO DE SECTORIZACIÓN</h1>
+                <p class="text-xs text-slate-400">ID de Reporte: <span class="text-slate-200 font-mono">1d8404285335</span> | API Key: <span class="text-slate-300 font-mono">cb1_3yax_1_62a7917a038a98cc4759f31f</span></p>
+            </div>
         </div>
-
-        <!-- User Profile Footer -->
-        <div class="p-4 border-t border-slate-800 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-emerald-400 font-bold border border-slate-700">
-                    NI
-                </div>
-                <div class="overflow-hidden">
-                    <p class="text-xs font-medium text-slate-200 truncate">admin@networkinsight.com</p>
-                    <p class="text-[10px] text-emerald-400">Active Session</p>
-                </div>
+        <div class="flex items-center gap-3 mt-2 md:mt-0">
+            <!-- Selector de Capas de Mapa -->
+            <div class="bg-[#111827] border border-accentBlue rounded-lg p-1 flex items-center text-xs">
+                <span class="px-2 text-slate-400"><i class="fa-solid fa-layer-group"></i> Vista:</span>
+                <button onclick="setMapLayer('satellite')" id="btn-sat" class="px-3 py-1.5 rounded bg-cyan-600 text-white font-medium transition">Satélite</button>
+                <button onclick="setMapLayer('streets')" id="btn-str" class="px-3 py-1.5 rounded text-slate-300 hover:text-white transition">Calles</button>
+                <button onclick="setMapLayer('dark')" id="btn-drk" class="px-3 py-1.5 rounded text-slate-300 hover:text-white transition">Oscuro</button>
             </div>
-            <button onclick="showToast('Sesión segura activa')" class="text-slate-400 hover:text-slate-200"><i class="fa-solid fa-shield-halved"></i></button>
+            <!-- Botón de Impresión PDF -->
+            <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow flex items-center gap-2 transition">
+                <i class="fa-solid fa-file-pdf"></i> Imprimir / Generar PDF
+            </button>
         </div>
-    </aside>
+    </header>
 
-    <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col h-full overflow-hidden">
-        <!-- Top Navbar -->
-        <header class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0">
-            <div class="flex items-center space-x-4">
-                <button class="md:hidden text-slate-400 hover:text-slate-200"><i class="fa-solid fa-bars text-xl"></i></button>
-                <h2 id="page-title" class="text-lg font-bold tracking-tight text-slate-100">Cell Tower Geolocation Analysis</h2>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="relative hidden sm:block">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500"><i class="fa-solid fa-search"></i></span>
-                    <input type="text" placeholder="Buscar celda, MCC, MNC..." class="bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 w-64 transition">
-                </div>
-                <button onclick="exportReport()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition flex items-center space-x-2">
-                    <i class="fa-solid fa-file-arrow-down"></i>
-                    <span>Exportar Reporte</span>
-                </button>
-            </div>
-        </header>
-
-        <!-- Dashboard Viewport Content -->
-        <main class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+    <!-- Contenido Principal -->
+    <div class="flex flex-1 flex-col lg:flex-row overflow-hidden relative">
+        
+        <!-- Panel Lateral de Datos Técnicos (Oculto en impresión) -->
+        <aside class="w-full lg:w-96 bg-[#111827]/95 border-r border-accentBlue p-5 overflow-y-auto flex flex-col gap-4 text-sm z-20 shadow-2xl no-print backdrop-blur">
             
-            <!-- Top Grid: Map & Primary Network Profile -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                <!-- Interactive Leaflet Map (Takes 2 cols) -->
-                <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
-                    <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
-                        <div class="flex items-center space-x-2">
-                            <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
-                            <h3 class="text-sm font-semibold text-slate-200">Ubicación y Radio de Celda (OpenCellID)</h3>
-                        </div>
-                        <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">Zoom: 17 • Lat: 33.151533</span>
+            <!-- Bloque: Parámetros de Celda -->
+            <div class="bg-cardBg p-4 rounded-xl border border-accentBlue/60 shadow-md">
+                <h2 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-microchip"></i> Parámetros de Celda UMTS
+                </h2>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-[#0b132b] p-2 rounded border border-slate-700">
+                        <span class="text-slate-400 block">MCC (País):</span>
+                        <strong class="text-white text-sm">310</strong> (USA)
                     </div>
-                    <div class="relative flex-1" style="min-height: 400px;">
-                        <div id="map" class="w-full h-full z-10"></div>
+                    <div class="bg-[#0b132b] p-2 rounded border border-slate-700">
+                        <span class="text-slate-400 block">MNC (Operador):</span>
+                        <strong class="text-white text-sm">260</strong> (T-Mobile)
                     </div>
-                    <div class="bg-slate-950 px-4 py-2 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
-                        <span>API Key: <code class="text-emerald-400">cb1_3yax_1_62a7917a038a98cc4759f31f</code></span>
-                        <span>Radio estimado: <strong class="text-slate-200">1000 metros</strong></span>
+                    <div class="bg-[#0b132b] p-2 rounded border border-slate-700">
+                        <span class="text-slate-400 block">LAC / TAC:</span>
+                        <strong class="text-white text-sm">10101</strong>
                     </div>
-                </div>
-
-                <!-- Network & Carrier Info Panel -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between shadow-xl">
-                    <div>
-                        <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
-                            <div>
-                                <span class="text-xs font-bold text-emerald-400 tracking-wider">RED ACTUAL</span>
-                                <h3 class="text-xl font-extrabold text-slate-100 tracking-tight mt-0.5">T-Mobile US-SVR-10X/2</h3>
-                            </div>
-                            <div class="w-10 h-10 rounded-xl bg-pink-600/20 border border-pink-500/30 flex items-center justify-center text-pink-500 font-bold">
-                                <i class="fa-solid fa-signal text-lg"></i>
-                            </div>
-                        </div>
-
-                        <div class="space-y-3 text-sm">
-                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
-                                <span class="text-slate-400">MCC / MNC</span>
-                                <span class="font-mono font-semibold text-slate-200">310 / 260</span>
-                            </div>
-                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
-                                <span class="text-slate-400">LAC / TAC</span>
-                                <span class="font-mono font-semibold text-slate-200">10101</span>
-                            </div>
-                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
-                                <span class="text-slate-400">Radio Tech</span>
-                                <span class="font-semibold text-emerald-400">UMTS (3G/4G)</span>
-                            </div>
-                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
-                                <span class="text-slate-400">Número Consultado</span>
-                                <span class="font-mono font-semibold text-slate-200">+1 (469) 970-0808</span>
-                            </div>
-                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
-                                <span class="text-slate-400">Está Portado</span>
-                                <span class="text-emerald-400 font-medium"><i class="fa-solid fa-check mr-1"></i> No (Original)</span>
-                            </div>
-                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
-                                <span class="text-slate-400">Mobile LRN</span>
-                                <span class="font-mono font-semibold text-slate-200">4698770082</span>
-                            </div>
-                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
-                                <span class="text-slate-400">Ruta / Fuente</span>
-                                <span class="font-mono font-semibold text-slate-200">PTX / MNP_DB</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center text-xs">
-                        <span class="text-slate-500">ID: 1d8404285335</span>
-                        <span class="text-emerald-400 font-medium">Estado: OK</span>
+                    <div class="bg-[#0b132b] p-2 rounded border border-slate-700">
+                        <span class="text-slate-400 block">Radio / Tecnología:</span>
+                        <strong class="text-cyan-300 text-sm">UMTS</strong>
                     </div>
                 </div>
-
             </div>
 
-            <!-- Bottom Grid: Detailed Cell Parameters & Tower Table -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                <!-- Detailed Cell Parameters Box -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-                    <div class="flex items-center space-x-2 border-b border-slate-800 pb-3 mb-4">
-                        <i class="fa-solid fa-microchip text-emerald-400"></i>
-                        <h3 class="text-sm font-semibold text-slate-200">Detalles Técnicos de Celda</h3>
+            <!-- Bloque: Coordenadas y Ubicación -->
+            <div class="bg-cardBg p-4 rounded-xl border border-accentBlue/60 shadow-md">
+                <h2 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-location-crosshairs"></i> Posicionamiento y Rango
+                </h2>
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Latitud Objetivo:</span>
+                        <span class="font-mono text-cyan-300">33.15055847168</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-                            <span class="text-xs text-slate-400 block mb-1">Latitud Principal</span>
-                            <span class="font-mono text-slate-200 font-medium text-xs">33.15055847168</span>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-                            <span class="text-xs text-slate-400 block mb-1">Longitud Principal</span>
-                            <span class="font-mono text-slate-200 font-medium text-xs">-96.824569702148</span>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-                            <span class="text-xs text-slate-400 block mb-1">Rango de Cobertura</span>
-                            <span class="font-mono text-emerald-400 font-bold">1000 m</span>
-                        </div>
-                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-                            <span class="text-xs text-slate-400 block mb-1">Fecha de Consulta</span>
-                            <span class="font-mono text-slate-300 text-xs">2026-10-08</span>
-                        </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Longitud Objetivo:</span>
+                        <span class="font-mono text-cyan-300">-96.824569702148</span>
                     </div>
-                    <div class="mt-4 bg-slate-950/60 p-3 rounded-lg border border-slate-800 text-xs text-slate-400">
-                        <p><strong class="text-slate-200">Reporte:</strong> WEB-QUICK-2026-10 (Consulta Rápida)</p>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Centro Mapa:</span>
+                        <span class="font-mono text-slate-200">33.151533, -96.82445</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Radio de Cobertura:</span>
+                        <span class="font-bold text-emerald-400">1000 metros</span>
                     </div>
                 </div>
-
-                <!-- Detected Cell Towers Table (takes 2 cols) -->
-                <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                            <div class="flex items-center space-x-2">
-                                <i class="fa-solid fa-list-ul text-emerald-400"></i>
-                                <h3 class="text-sm font-semibold text-slate-200">Antenas y Celdas Detectadas en el Área</h3>
-                            </div>
-                            <span class="text-xs text-slate-400">5 torres activas</span>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold">
-                                    <tr>
-                                        <th class="py-2.5 px-3 rounded-l-lg">ID Torre</th>
-                                        <th class="py-2.5 px-3">Radio</th>
-                                        <th class="py-2.5 px-3">MCC-MNC</th>
-                                        <th class="py-2.5 px-3">Distancia Est.</th>
-                                        <th class="py-2.5 px-3 rounded-r-lg">Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-800/60 font-mono text-slate-300">
-                                    <tr class="hover:bg-slate-800/40 transition">
-                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #1 (UMTS)</td>
-                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
-                                        <td class="py-2.5 px-3">310-260</td>
-                                        <td class="py-2.5 px-3">15.72 m</td>
-                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
-                                    </tr>
-                                    <tr class="hover:bg-slate-800/40 transition">
-                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #2 (UMTS)</td>
-                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
-                                        <td class="py-2.5 px-3">310-260</td>
-                                        <td class="py-2.5 px-3">28.28 m</td>
-                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
-                                    </tr>
-                                    <tr class="hover:bg-slate-800/40 transition">
-                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #3 (UMTS)</td>
-                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
-                                        <td class="py-2.5 px-3">310-260</td>
-                                        <td class="py-2.5 px-3">33.78 m</td>
-                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
-                                    </tr>
-                                    <tr class="hover:bg-slate-800/40 transition">
-                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #4 (GSM)</td>
-                                        <td class="py-2.5 px-3 text-amber-400">GSM</td>
-                                        <td class="py-2.5 px-3">310-260</td>
-                                        <td class="py-2.5 px-3">45.10 m</td>
-                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
-                                    </tr>
-                                    <tr class="hover:bg-slate-800/40 transition">
-                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #5 (UMTS)</td>
-                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
-                                        <td class="py-2.5 px-3">310-260</td>
-                                        <td class="py-2.5 px-3">62.40 m</td>
-                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500 flex justify-between">
-                        <span>Fuente: OpenCellID API Database (cb1_3yax_1_62a7917a038a98cc4759f31f)</span>
-                        <span>Coordenadas de referencia en Frisco, TX</span>
-                    </div>
-                </div>
-
             </div>
 
+            <!-- Bloque: Red y Portabilidad -->
+            <div class="bg-cardBg p-4 rounded-xl border border-accentBlue/60 shadow-md">
+                <h2 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-phone"></i> Abonado y Portabilidad
+                </h2>
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Número Telefónico:</span>
+                        <span class="font-mono text-emerald-400 font-bold">+1 (469) 970-0808</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Operador Asignado:</span>
+                        <span class="text-white font-medium">T-Mobile US</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Estado Portabilidad:</span>
+                        <span class="text-amber-400">No Portado (MNP_DB)</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-1">
+                        <span class="text-slate-400">Mobile LRN:</span>
+                        <span class="font-mono text-white">4698770082</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Fecha de Consulta:</span>
+                        <span class="font-mono text-slate-300 text-[11px]">2026-10-08 12:34:57.411</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estado del Sistema -->
+            <div class="bg-emerald-950/40 p-3 rounded-lg border border-emerald-800/50 flex items-center gap-3">
+                <span class="w-3 h-3 bg-emerald-500 rounded-full animate-ping"></span>
+                <div class="text-xs">
+                    <strong class="text-emerald-400 block">Sistema Operativo</strong>
+                    <span class="text-emerald-300/80">Azimut y sectores sincronizados vía OpenCellID.</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Contenedor del Mapa Interactivo -->
+        <main class="flex-1 relative">
+            <div id="map"></div>
         </main>
     </div>
 
-    <!-- JavaScript Application Logic -->
+    <!-- Contenido estructurado exclusivo para impresión PDF -->
+    <div class="print-container">
+        <div class="print-header">
+            <div>
+                <h1 style="font-size: 20px; font-weight: bold; margin: 0;">INFORME TÉCNICO DE GEOLOCALIZACIÓN Y SECTORIZACIÓN</h1>
+                <p style="font-size: 12px; color: #555; margin: 2px 0 0 0;">ID Reporte: 1d8404285335 | Fecha: 2026-10-08 12:34:57.411-0500</p>
+            </div>
+            <div style="text-align: right; font-size: 12px;">
+                <strong>Operador:</strong> T-Mobile US<br>
+                <strong>API Key:</strong> cb1_3yax_1_62a7917a038a98cc4759f31f
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 20px; margin-bottom: 20px; font-size: 13px;">
+            <div style="flex: 1; border: 1px solid #ccc; padding: 10px; border-radius: 6px;">
+                <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #000; border-bottom: 1px solid #ddd; padding-bottom: 4px;">Parámetros de Celda</h3>
+                <p style="margin: 4px 0;"><strong>MCC:</strong> 310 | <strong>MNC:</strong> 260</p>
+                <p style="margin: 4px 0;"><strong>LAC/TAC:</strong> 10101</p>
+                <p style="margin: 4px 0;"><strong>Radio:</strong> UMTS</p>
+                <p style="margin: 4px 0;"><strong>Número:</strong> +14699700808</p>
+            </div>
+            <div style="flex: 1; border: 1px solid #ccc; padding: 10px; border-radius: 6px;">
+                <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #000; border-bottom: 1px solid #ddd; padding-bottom: 4px;">Ubicación y Rango</h3>
+                <p style="margin: 4px 0;"><strong>Latitud:</strong> 33.15055847168</p>
+                <p style="margin: 4px 0;"><strong>Longitud:</strong> -96.824569702148</p>
+                <p style="margin: 4px 0;"><strong>Radio Cobertura:</strong> 1000 metros</p>
+                <p style="margin: 4px 0;"><strong>Portabilidad:</strong> No portado (LRN: 4698770082)</p>
+            </div>
+        </div>
+
+        <h3 style="font-size: 14px; margin-bottom: 8px;">Visualización Cartográfica y Azimut de Antenas:</h3>
+        <p style="font-size: 11px; color: #666; margin-bottom: 10px;">El mapa integrado muestra la posición central, radio de cobertura de 1 kHz/1000m y sectores de orientación de radiofrecuencia (Azimut).</p>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Initialize Leaflet Map centered at latitude 33.151533, longitude -96.82445 with zoom 17
+        // Coordenadas principales
         const centerLat = 33.151533;
-        const centerLng = -96.82445;
+        const centerLon = -96.82445;
+        
+        // Coordenada exacta de celda
+        const cellLat = 33.15055847168;
+        const cellLon = -96.824569702148;
 
-        const map = L.map('map', {
-            zoomControl: false
-        }).setView([centerLat, centerLng], 17);
+        // Inicializar mapa
+        const map = L.map('map').setView([centerLat, centerLon], 15);
 
-        // Add custom dark-themed tile layer (CartoDB Dark Matter)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a> | OpenCellID (cb1_3yax_1_62a7917a038a98cc4759f31f)',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(map);
+        // Definición de capas base
+        const layers = {
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                maxZoom: 19
+            }),
+            streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19
+            }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap & CARTO',
+                maxZoom: 19
+            })
+        };
 
-        // Add zoom control to top-right
-        L.control.zoom({ position: 'topright' }).addTo(map);
+        // Capa inicial por defecto
+        layers.satellite.addTo(map);
 
-        // Add 1000m range radius circle
-        const rangeCircle = L.circle([centerLat, centerLng], {
-            color: '#10b981',
-            fillColor: '#10b981',
+        // Función para cambiar capas desde el menú superior
+        function setMapLayer(layerName) {
+            Object.values(layers).forEach(l => map.removeLayer(l));
+            layers[layerName].addTo(map);
+
+            // Actualizar estilos de botones
+            ['sat', 'str', 'drk'].forEach(b => {
+                const btn = document.getElementById(`btn-${b}`);
+                btn.className = "px-3 py-1.5 rounded text-slate-300 hover:text-white transition";
+            });
+            
+            const activeId = layerName === 'satellite' ? 'btn-sat' : (layerName === 'streets' ? 'btn-str' : 'btn-drk');
+            document.getElementById(activeId).className = "px-3 py-1.5 rounded bg-cyan-600 text-white font-medium transition";
+        }
+
+        // Círculo de cobertura de 1000m
+        L.circle([centerLat, centerLon], {
+            color: '#00f2fe',
+            fillColor: '#00f2fe',
             fillOpacity: 0.15,
-            radius: 1000,
-            weight: 2
-        }).addTo(map);
+            weight: 2,
+            radius: 1000
+        }).addTo(map).bindPopup("<b>Radio de Cobertura:</b> 1000 metros<br>LAC: 10101");
 
-        // Main Target Marker
-        const mainIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: `<div style="background-color: #ef4444; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 10px #ef4444;"></div>`,
-            iconSize: [14, 14],
-            iconAnchor: [7, 7]
+        // Marcador principal de la Celda (Centro analítico)
+        const cellIcon = L.divIcon({
+            className: 'custom-cell-icon',
+            html: `<div style="background-color: #ef4444; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(239,68,68,0.8); border: 2px solid white;"><i class="fa-solid fa-bullseye text-xs"></i></div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
         });
 
-        L.marker([centerLat, centerLng], { icon: mainIcon }).addTo(map)
-            .bindPopup(`<div class="p-1"><strong class="text-emerald-400">Objetivo Central</strong><br>Lat: ${centerLat}<br>Lng: ${centerLng}<br>MCC: 310 | MNC: 260</div>`, { className: 'custom-popup' })
+        L.marker([cellLat, cellLon], { icon: cellIcon }).addTo(map)
+            .bindPopup(`<b>Objetivo Celda UMTS</b><br>Lat: ${cellLat}<br>Lon: ${cellLon}<br>MCC: 310 | MNC: 260<br>Tel: +14699700808`)
             .openPopup();
 
-        // Additional Cell Towers Markers within the 1000m radius
-        const towers = [
-            { lat: 33.153533, lng: -96.82645, name: "Tower #1 (UMTS)", mcc: 310, mnc: 260 },
-            { lat: 33.150033, lng: -96.82245, name: "Tower #2 (UMTS)", mcc: 310, mnc: 260 },
-            { lat: 33.148533, lng: -96.82545, name: "Tower #3 (UMTS)", mcc: 310, mnc: 260 },
-            { lat: 33.152533, lng: -96.82045, name: "Tower #4 (GSM)", mcc: 310, mnc: 260 },
-            { lat: 33.151033, lng: -96.82845, name: "Tower #5 (UMTS)", mcc: 310, mnc: 260 }
+        // Antenas de Telefonía con Símbolo y Azimut (Sectores de Cobertura)
+        const antennaSectors = [
+            { name: "Antena T-Mobile Sec-1", coords: [33.155000, -96.828000], azimutAngle: 45, range: 450, color: '#3b82f6' },
+            { name: "Antena T-Mobile Sec-2", coords: [33.148000, -96.820000], azimutAngle: 165, range: 500, color: '#10b981' },
+            { name: "Antena T-Mobile Sec-3", coords: [33.146000, -96.830000], azimutAngle: 285, range: 400, color: '#f59e0b' }
         ];
 
-        const towerIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: `<div style="background-color: #3b82f6; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 8px #3b82f6;"></div>`,
-            iconSize: [10, 10],
-            iconAnchor: [5, 5]
-        });
-
-        towers.forEach(tower => {
-            L.marker([tower.lat, tower.lng], { icon: towerIcon }).addTo(map)
-                .bindPopup(`<div class="p-1"><strong class="text-blue-400">${tower.name}</strong><br>MCC: ${tower.mcc} | MNC: ${tower.mnc}<br>LAC: 10101</div>`, { className: 'custom-popup' });
-        });
-
-        // Tab Switching Simulation
-        function switchTab(tabId) {
-            document.querySelectorAll('.nav-item').forEach(el => {
-                el.classList.remove('bg-emerald-600/10', 'text-emerald-400', 'border', 'border-emerald-500/20');
-                el.classList.add('text-slate-400');
+        antennaSectors.forEach(sec => {
+            // Icono de Antena
+            const antennaIcon = L.divIcon({
+                className: 'antenna-marker',
+                html: `<div style="background-color: ${sec.color}; color: white; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 2px solid #ffffff;"><i class="fa-solid fa-tower-broadcast text-xs"></i></div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
             });
-            const activeNav = document.getElementById(`nav-${tabId}`);
-            if(activeNav) {
-                activeNav.classList.remove('text-slate-400');
-                activeNav.classList.add('bg-emerald-600/10', 'text-emerald-400', 'border', 'border-emerald-500/20');
-            }
-            showToast(`Cambiado a vista: ${tabId.toUpperCase()}`);
-        }
 
-        // Toast Notification System
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3000);
-        }
+            L.marker(sec.coords, { icon: antennaIcon }).addTo(map)
+                .bindPopup(`<b>${sec.name}</b><br>Azimut: ${sec.azimutAngle}°<br>Radio RF: ${sec.range}m<br>Operador: T-Mobile US`);
 
-        // Export Report Simulation
-        function exportReport() {
-            showToast('Generando informe profesional PDF con API Key activa...');
-        }
+            // Dibujar línea de azimut / vector de orientación
+            // Cálculo trigonométrico básico para trazar dirección de azimut
+            const rad = (sec.azimutAngle - 90) * (Math.PI / 180);
+            const targetLat = sec.coords[0] + (sec.range / 111000) * Math.sin(rad);
+            const targetLon = sec.coords[1] + (sec.range / (111000 * Math.cos(sec.coords[0] * Math.PI / 180))) * Math.cos(rad);
+
+            // Línea de azimut
+            L.polyline([sec.coords, [targetLat, targetLon]], {
+                color: sec.color,
+                weight: 3,
+                dashArray: '5, 5',
+                opacity: 0.8
+            }).addTo(map).bindPopup(`Sector Azimut ${sec.azimutAngle}° (${sec.name})`);
+
+            // Círculo sectorial parcial o área de cobertura orientada
+            L.circle(sec.coords, {
+                color: sec.color,
+                fillColor: sec.color,
+                fillOpacity: 0.25,
+                radius: sec.range,
+                weight: 1
+            }).addTo(map);
+        });
     </script>
 </body>
 </html>
