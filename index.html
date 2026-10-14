@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetworkInsight Pro - Telecom Intelligence Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#10b981',
+                            600: '#059669',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+        }
+        .custom-popup .leaflet-popup-tip {
+            background: #1e293b;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex h-screen overflow-hidden">
+
+    <!-- Toast Notification Container -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center space-x-2">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toast-msg">Acción realizada con éxito</span>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between hidden md:flex">
+        <div>
+            <!-- Brand Logo -->
+            <div class="h-16 flex items-center px-6 border-b border-slate-800 space-x-3">
+                <div class="bg-emerald-500 text-slate-950 p-2 rounded-lg font-bold">
+                    <i class="fa-solid fa-tower-broadcast text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold tracking-wider text-sm text-slate-100">NetworkInsight</h1>
+                    <span class="text-xs text-emerald-400 font-semibold tracking-widest">PRO v4.2</span>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="p-4 space-y-1">
+                <a href="#" onclick="switchTab('overview')" id="nav-overview" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-chart-pie w-5"></i>
+                    <span class="text-sm font-medium">Overview</span>
+                </a>
+                <a href="#" onclick="switchTab('towers')" id="nav-towers" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 transition">
+                    <i class="fa-solid fa-tower-cell w-5"></i>
+                    <span class="text-sm font-medium">Cell Towers</span>
+                </a>
+                <a href="#" onclick="switchTab('network')" id="nav-network" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-network-wired w-5"></i>
+                    <span class="text-sm font-medium">Network Info</span>
+                </a>
+                <a href="#" onclick="switchTab('lookup')" id="nav-lookup" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-address-book w-5"></i>
+                    <span class="text-sm font-medium">Number Lookup</span>
+                </a>
+                <a href="#" onclick="switchTab('analytics')" id="nav-analytics" class="nav-item flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-chart-line w-5"></i>
+                    <span class="text-sm font-medium">Analytics</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- User Profile Footer -->
+        <div class="p-4 border-t border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-emerald-400 font-bold border border-slate-700">
+                    NI
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-xs font-medium text-slate-200 truncate">admin@networkinsight.com</p>
+                    <p class="text-[10px] text-emerald-400">Active Session</p>
+                </div>
+            </div>
+            <button onclick="showToast('Sesión segura activa')" class="text-slate-400 hover:text-slate-200"><i class="fa-solid fa-shield-halved"></i></button>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col h-full overflow-hidden">
+        <!-- Top Navbar -->
+        <header class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0">
+            <div class="flex items-center space-x-4">
+                <button class="md:hidden text-slate-400 hover:text-slate-200"><i class="fa-solid fa-bars text-xl"></i></button>
+                <h2 id="page-title" class="text-lg font-bold tracking-tight text-slate-100">Cell Tower Geolocation Analysis</h2>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="relative hidden sm:block">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500"><i class="fa-solid fa-search"></i></span>
+                    <input type="text" placeholder="Buscar celda, MCC, MNC..." class="bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 w-64 transition">
+                </div>
+                <button onclick="exportReport()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition flex items-center space-x-2">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                    <span>Exportar Reporte</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Viewport Content -->
+        <main class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+            
+            <!-- Top Grid: Map & Primary Network Profile -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Interactive Leaflet Map (Takes 2 cols) -->
+                <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
+                    <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
+                            <h3 class="text-sm font-semibold text-slate-200">Ubicación y Radio de Celda (OpenCellID)</h3>
+                        </div>
+                        <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">Zoom: 17 • Lat: 33.151533</span>
+                    </div>
+                    <div class="relative flex-1" style="min-height: 400px;">
+                        <div id="map" class="w-full h-full z-10"></div>
+                    </div>
+                    <div class="bg-slate-950 px-4 py-2 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
+                        <span>API Key: <code class="text-emerald-400">cb1_3yax_1_62a7917a038a98cc4759f31f</code></span>
+                        <span>Radio estimado: <strong class="text-slate-200">1000 metros</strong></span>
+                    </div>
+                </div>
+
+                <!-- Network & Carrier Info Panel -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between shadow-xl">
+                    <div>
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+                            <div>
+                                <span class="text-xs font-bold text-emerald-400 tracking-wider">RED ACTUAL</span>
+                                <h3 class="text-xl font-extrabold text-slate-100 tracking-tight mt-0.5">T-Mobile US-SVR-10X/2</h3>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-pink-600/20 border border-pink-500/30 flex items-center justify-center text-pink-500 font-bold">
+                                <i class="fa-solid fa-signal text-lg"></i>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                                <span class="text-slate-400">MCC / MNC</span>
+                                <span class="font-mono font-semibold text-slate-200">310 / 260</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                                <span class="text-slate-400">LAC / TAC</span>
+                                <span class="font-mono font-semibold text-slate-200">10101</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                                <span class="text-slate-400">Radio Tech</span>
+                                <span class="font-semibold text-emerald-400">UMTS (3G/4G)</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                                <span class="text-slate-400">Número Consultado</span>
+                                <span class="font-mono font-semibold text-slate-200">+1 (469) 970-0808</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                                <span class="text-slate-400">Está Portado</span>
+                                <span class="text-emerald-400 font-medium"><i class="fa-solid fa-check mr-1"></i> No (Original)</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                                <span class="text-slate-400">Mobile LRN</span>
+                                <span class="font-mono font-semibold text-slate-200">4698770082</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-slate-800/60">
+                                <span class="text-slate-400">Ruta / Fuente</span>
+                                <span class="font-mono font-semibold text-slate-200">PTX / MNP_DB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center text-xs">
+                        <span class="text-slate-500">ID: 1d8404285335</span>
+                        <span class="text-emerald-400 font-medium">Estado: OK</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Bottom Grid: Detailed Cell Parameters & Tower Table -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Detailed Cell Parameters Box -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                    <div class="flex items-center space-x-2 border-b border-slate-800 pb-3 mb-4">
+                        <i class="fa-solid fa-microchip text-emerald-400"></i>
+                        <h3 class="text-sm font-semibold text-slate-200">Detalles Técnicos de Celda</h3>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
+                            <span class="text-xs text-slate-400 block mb-1">Latitud Principal</span>
+                            <span class="font-mono text-slate-200 font-medium text-xs">33.15055847168</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
+                            <span class="text-xs text-slate-400 block mb-1">Longitud Principal</span>
+                            <span class="font-mono text-slate-200 font-medium text-xs">-96.824569702148</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
+                            <span class="text-xs text-slate-400 block mb-1">Rango de Cobertura</span>
+                            <span class="font-mono text-emerald-400 font-bold">1000 m</span>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
+                            <span class="text-xs text-slate-400 block mb-1">Fecha de Consulta</span>
+                            <span class="font-mono text-slate-300 text-xs">2026-10-08</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 bg-slate-950/60 p-3 rounded-lg border border-slate-800 text-xs text-slate-400">
+                        <p><strong class="text-slate-200">Reporte:</strong> WEB-QUICK-2026-10 (Consulta Rápida)</p>
+                    </div>
+                </div>
+
+                <!-- Detected Cell Towers Table (takes 2 cols) -->
+                <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-list-ul text-emerald-400"></i>
+                                <h3 class="text-sm font-semibold text-slate-200">Antenas y Celdas Detectadas en el Área</h3>
+                            </div>
+                            <span class="text-xs text-slate-400">5 torres activas</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold">
+                                    <tr>
+                                        <th class="py-2.5 px-3 rounded-l-lg">ID Torre</th>
+                                        <th class="py-2.5 px-3">Radio</th>
+                                        <th class="py-2.5 px-3">MCC-MNC</th>
+                                        <th class="py-2.5 px-3">Distancia Est.</th>
+                                        <th class="py-2.5 px-3 rounded-r-lg">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800/60 font-mono text-slate-300">
+                                    <tr class="hover:bg-slate-800/40 transition">
+                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #1 (UMTS)</td>
+                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
+                                        <td class="py-2.5 px-3">310-260</td>
+                                        <td class="py-2.5 px-3">15.72 m</td>
+                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40 transition">
+                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #2 (UMTS)</td>
+                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
+                                        <td class="py-2.5 px-3">310-260</td>
+                                        <td class="py-2.5 px-3">28.28 m</td>
+                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40 transition">
+                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #3 (UMTS)</td>
+                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
+                                        <td class="py-2.5 px-3">310-260</td>
+                                        <td class="py-2.5 px-3">33.78 m</td>
+                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40 transition">
+                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #4 (GSM)</td>
+                                        <td class="py-2.5 px-3 text-amber-400">GSM</td>
+                                        <td class="py-2.5 px-3">310-260</td>
+                                        <td class="py-2.5 px-3">45.10 m</td>
+                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40 transition">
+                                        <td class="py-2.5 px-3 font-semibold text-slate-200">Tower #5 (UMTS)</td>
+                                        <td class="py-2.5 px-3 text-emerald-400">UMTS</td>
+                                        <td class="py-2.5 px-3">310-260</td>
+                                        <td class="py-2.5 px-3">62.40 m</td>
+                                        <td class="py-2.5 px-3"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px]">Activa</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500 flex justify-between">
+                        <span>Fuente: OpenCellID API Database (cb1_3yax_1_62a7917a038a98cc4759f31f)</span>
+                        <span>Coordenadas de referencia en Frisco, TX</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Initialize Leaflet Map centered at latitude 33.151533, longitude -96.82445 with zoom 17
+        const centerLat = 33.151533;
+        const centerLng = -96.82445;
+
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([centerLat, centerLng], 17);
+
+        // Add custom dark-themed tile layer (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a> | OpenCellID (cb1_3yax_1_62a7917a038a98cc4759f31f)',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // Add zoom control to top-right
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        // Add 1000m range radius circle
+        const rangeCircle = L.circle([centerLat, centerLng], {
+            color: '#10b981',
+            fillColor: '#10b981',
+            fillOpacity: 0.15,
+            radius: 1000,
+            weight: 2
+        }).addTo(map);
+
+        // Main Target Marker
+        const mainIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #ef4444; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 10px #ef4444;"></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+        });
+
+        L.marker([centerLat, centerLng], { icon: mainIcon }).addTo(map)
+            .bindPopup(`<div class="p-1"><strong class="text-emerald-400">Objetivo Central</strong><br>Lat: ${centerLat}<br>Lng: ${centerLng}<br>MCC: 310 | MNC: 260</div>`, { className: 'custom-popup' })
+            .openPopup();
+
+        // Additional Cell Towers Markers within the 1000m radius
+        const towers = [
+            { lat: 33.153533, lng: -96.82645, name: "Tower #1 (UMTS)", mcc: 310, mnc: 260 },
+            { lat: 33.150033, lng: -96.82245, name: "Tower #2 (UMTS)", mcc: 310, mnc: 260 },
+            { lat: 33.148533, lng: -96.82545, name: "Tower #3 (UMTS)", mcc: 310, mnc: 260 },
+            { lat: 33.152533, lng: -96.82045, name: "Tower #4 (GSM)", mcc: 310, mnc: 260 },
+            { lat: 33.151033, lng: -96.82845, name: "Tower #5 (UMTS)", mcc: 310, mnc: 260 }
+        ];
+
+        const towerIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #3b82f6; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 8px #3b82f6;"></div>`,
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
+        });
+
+        towers.forEach(tower => {
+            L.marker([tower.lat, tower.lng], { icon: towerIcon }).addTo(map)
+                .bindPopup(`<div class="p-1"><strong class="text-blue-400">${tower.name}</strong><br>MCC: ${tower.mcc} | MNC: ${tower.mnc}<br>LAC: 10101</div>`, { className: 'custom-popup' });
+        });
+
+        // Tab Switching Simulation
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('bg-emerald-600/10', 'text-emerald-400', 'border', 'border-emerald-500/20');
+                el.classList.add('text-slate-400');
+            });
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if(activeNav) {
+                activeNav.classList.remove('text-slate-400');
+                activeNav.classList.add('bg-emerald-600/10', 'text-emerald-400', 'border', 'border-emerald-500/20');
+            }
+            showToast(`Cambiado a vista: ${tabId.toUpperCase()}`);
+        }
+
+        // Toast Notification System
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Export Report Simulation
+        function exportReport() {
+            showToast('Generando informe profesional PDF con API Key activa...');
+        }
+    </script>
+</body>
+</html>
